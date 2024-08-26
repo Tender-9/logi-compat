@@ -9,14 +9,38 @@ EV_ABS = evdev.ecodes.EV_ABS
 class ControllerManager:
     def __init__(self, virtual_device):
         self.virtual_device = virtual_device
+        self.running = 0
+        
+        self.view     = ViewController(self, virtual_device)
         self.throttle = ThrottleController(self, virtual_device)
         self.pitch    = PitchController(self, virtual_device)
         self.roll     = RollController(self, virtual_device)
         self.yaw      = YawController(self, virtual_device)
         self.key      = KeyController(self, virtual_device)
-        self.view     = ViewController(self, virtual_device)
+
+        self.zero_all()
+    
+    def toggle(self, event):
+        if event.value == 1:
+            return
+        elif self.running == 0: 
+            print("Running...")
+            self.running = 1
+        elif self.running == 1:
+            self.zero_all()
+            self.running = 0
+            print("Paused...")
+    
+    def zero_all(self):
+        self.throttle.zero()
+        self.pitch.zero()
+        self.roll.zero()
+        self.yaw.zero()
+        self.view.zero()
+        self.virtual_device.syn()
 
     def handle_event(self, event):
+        if self.running == 0 and event.code != logi.BTN7: return
         if event.type == EV_ABS:
             if event.code == logi.THROTTLE: self.throttle.update(event)
             elif event.code == logi.PITCH: self.pitch.update(event)
@@ -28,10 +52,32 @@ class ControllerManager:
         self.virtual_device.syn()
 
 
+
+
 class Controller:
     def __init__(self, controller_manager, virtual_device):
         self.controller_manager = controller_manager
         self.virtual_device = virtual_device
+
+class ViewController(Controller):
+    def __init__(self, controller_manager, virtual_device):
+        super().__init__(controller_manager, virtual_device)
+    
+    def update(self, event):
+        if event.code == logi.HATX: axis = xbox.RIGHT_X
+        elif event.code == logi.HATY: axis = xbox.RIGHT_Y
+        else: return
+
+        if event.value < 0: 
+            self.virtual_device.write(EV_ABS, axis, 0)
+        elif event.value == 0:
+            self.virtual_device.write(EV_ABS, axis, 512)
+        elif event.value > 0:
+            self.virtual_device.write(EV_ABS, axis, 1023)
+    
+    def zero(self):
+        self.virtual_device.write(EV_ABS, xbox.RIGHT_X, 512)
+        self.virtual_device.write(EV_ABS, xbox.RIGHT_Y, 512)
 
 class ThrottleController(Controller):
     def __init__(self, controller_manager, virtual_device):
@@ -51,42 +97,36 @@ class ThrottleController(Controller):
             self.virtual_device.write(EV_ABS, xbox.LT, self.state)
             self.virtual_device.write(EV_ABS, xbox.RT, 0)
 
+    def zero(self):
+        self.virtual_device.write(EV_ABS, xbox.LT, 0)
+        self.virtual_device.write(EV_ABS, xbox.RT, 0)
+
 class PitchController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
     def update(self, event):
         self.virtual_device.write(EV_ABS, xbox.LEFT_Y, event.value)
 
+    def zero(self):
+        self.virtual_device.write(EV_ABS, xbox.LEFT_Y, 512)
+
 class RollController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
     def update(self, event):
         self.virtual_device.write(EV_ABS, xbox.LEFT_X, event.value)
-        pass
+    
+    def zero(self):
+        self.virtual_device.write(EV_ABS, xbox.LEFT_X, 512)
 
 class YawController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
     def update(self, event):
         pass
+    def zero(self):
+        pass
 
-class ViewController(Controller):
-    def __init__(self, controller_manager, virtual_device):
-        super().__init__(controller_manager, virtual_device)
-    
-    def update(self, event):
-        if event.code == logi.HATX: axis = xbox.RIGHT_X
-        elif event.code == logi.HATY: axis = xbox.RIGHT_Y
-        else: return
-
-        if event.value < 0: 
-            self.virtual_device.write(EV_ABS, axis, 0)
-        elif event.value == 0:
-            self.virtual_device.write(EV_ABS, axis, 512)
-        elif event.value > 0:
-            self.virtual_device.write(EV_ABS, axis, 1023)
-
-            
 class KeyController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
@@ -96,6 +136,8 @@ class KeyController(Controller):
             self.virtual_device.write(EV_KEY, xbox.A, event.value)
         elif event.code == logi.THUMB:
             self.virtual_device.write(EV_KEY, xbox.DPAD_R, event.value)
+        elif event.code == logi.BTN7:
+            self.controller_manager.toggle(event)
         elif event.code == logi.BTN12:
             self.controller_manager.throttle.update(event)
 
