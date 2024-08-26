@@ -14,13 +14,16 @@ class ControllerManager:
         self.roll     = RollController(self, virtual_device)
         self.yaw      = YawController(self, virtual_device)
         self.key      = KeyController(self, virtual_device)
-        
+        self.view     = ViewController(self, virtual_device)
+
     def handle_event(self, event):
         if event.type == EV_ABS:
             if event.code == logi.THROTTLE: self.throttle.update(event)
             elif event.code == logi.PITCH: self.pitch.update(event)
             elif event.code == logi.ROLL: self.roll.update(event)
             elif event.code == logi.YAW: self.yaw.update(event)
+            elif event.code == logi.HATX: self.view.update(event)
+            elif event.code == logi.HATY: self.view.update(event)
         elif event.type == EV_KEY: self.key.update(event)
         self.virtual_device.syn()
 
@@ -67,6 +70,23 @@ class YawController(Controller):
     def update(self, event):
         pass
 
+class ViewController(Controller):
+    def __init__(self, controller_manager, virtual_device):
+        super().__init__(controller_manager, virtual_device)
+    
+    def update(self, event):
+        if event.code == logi.HATX: axis = xbox.RIGHT_X
+        elif event.code == logi.HATY: axis = xbox.RIGHT_Y
+        else: return
+
+        if event.value < 0: 
+            self.virtual_device.write(EV_ABS, axis, 0)
+        elif event.value == 0:
+            self.virtual_device.write(EV_ABS, axis, 512)
+        elif event.value > 0:
+            self.virtual_device.write(EV_ABS, axis, 1023)
+
+            
 class KeyController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
