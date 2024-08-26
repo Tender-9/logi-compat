@@ -84,7 +84,7 @@ _abs_info = [
              flat = 0,  resolution = 0))
 ]
 
-name = "Hybrid Controller"
+name = "Custom Controller"
 events = {
     ecodes.EV_KEY : _key_info,
     ecodes.EV_ABS : _abs_info
