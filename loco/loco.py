@@ -1,10 +1,12 @@
 import random
 import evdev
-import logi
-import xbox
+import devices
 
 EV_KEY = evdev.ecodes.EV_KEY
 EV_ABS = evdev.ecodes.EV_ABS
+
+logi = devices.LogiController()
+xbox = devices.XboxController()
 
 class ControllerManager:
     def __init__(self, virtual_device):
@@ -67,15 +69,15 @@ class ViewController(Controller):
         else: return
 
         if event.value < 0: 
-            self.virtual_device.write(EV_ABS, axis, 0)
+            self.virtual_device.write(EV_ABS, axis, axis.min)
         elif event.value == 0:
-            self.virtual_device.write(EV_ABS, axis, 512)
+            self.virtual_device.write(EV_ABS, axis, axis.rest)
         elif event.value > 0:
-            self.virtual_device.write(EV_ABS, axis, 1023)
+            self.virtual_device.write(EV_ABS, axis, axis.max)
     
     def zero(self):
-        self.virtual_device.write(EV_ABS, xbox.RIGHT_X, 512)
-        self.virtual_device.write(EV_ABS, xbox.RIGHT_Y, 512)
+        self.virtual_device.write(EV_ABS, xbox.RIGHT_X, xbox.RIGHT_X.rest)
+        self.virtual_device.write(EV_ABS, xbox.RIGHT_Y, xbox.RIGHT_Y.rest)
 
 class ThrottleController(Controller):
     def __init__(self, controller_manager, virtual_device):
@@ -88,45 +90,69 @@ class ThrottleController(Controller):
         elif event.type == EV_KEY: self.rev_state = event.value
 
         if self.rev_state == 0:
-            self.virtual_device.write(EV_ABS, xbox.LT, 0)
+            self.virtual_device.write(EV_ABS, xbox.LT, xbox.LT.rest)
             self.virtual_device.write(EV_ABS, xbox.RT, self.state)
 
         elif self.rev_state == 1:
             self.virtual_device.write(EV_ABS, xbox.LT, self.state)
-            self.virtual_device.write(EV_ABS, xbox.RT, 0)
+            self.virtual_device.write(EV_ABS, xbox.RT, xbox.RT.rest)
 
     def zero(self):
-        self.virtual_device.write(EV_ABS, xbox.LT, 0)
-        self.virtual_device.write(EV_ABS, xbox.RT, 0)
+        self.virtual_device.write(EV_ABS, xbox.LT, xbox.LT.rest)
+        self.virtual_device.write(EV_ABS, xbox.RT, xbox.RT.rest)
 
 class PitchController(Controller):
     def __init__(self, controller_manager, virtual_device):
-        super().__init__(controller_manager, virtual_device)
+        super().__init__(controller_manager, virtual_device) 
+        self.input  = logi.PITCH
+        self.output = xbox.LEFT_Y
+
     def update(self, event):
-        self.virtual_device.write(EV_ABS, xbox.LEFT_Y, event.value)
+        value = self.translate(event.value)
+        self.virtual_device.write(EV_ABS, self.output, value)
+    
+    def translate(self, value):
+        position = (value - self.input.min) / (self.input.max - self.input.min)
+        target = self.output.min + position * (self.output.max - self.output.min)
+        return int(round(target))
+
     def zero(self):
-        self.virtual_device.write(EV_ABS, xbox.LEFT_Y, 512)
+        self.virtual_device.write(EV_ABS, xbox.LEFT_Y, xbox.LEFT_Y.rest)
 
 class RollController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
+        self.input  = logi.ROLL
+        self.output = xbox.LEFT_X  
+    
     def update(self, event):
-        self.virtual_device.write(EV_ABS, xbox.LEFT_X, event.value) 
+        value = self.translate(event.value)
+        self.virtual_device.write(EV_ABS, xbox.LEFT_X, value) 
+    
+    def translate(self, value):
+        position = (value - self.input.min) / (self.input.max - self.input.min)
+        target = self.output.min + position * (self.output.max - self.output.min)
+        return int(round(target))
+    
     def zero(self):
-        self.virtual_device.write(EV_ABS, xbox.LEFT_X, 512)
+        self.virtual_device.write(EV_ABS, xbox.LEFT_X, xbox.LEFT_X.rest)
 
 class YawController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
-        self.nullzone = 100
+        self.input = logi.YAW
+        self.output = None
+        self.nullzone = 160
+
     def update(self, event):
-        if event.value <= (255/2 - self.nullzone/2):
+        if event.value <= (self.input.rest - self.nullzone/2):
             self.virtual_device.write(EV_KEY, xbox.LB, 1)
             self.virtual_device.write(EV_KEY, xbox.RB, 0)
-        elif event.value >= (255/2 + self.nullzone/2):
+        elif event.value >= (self.input.rest + self.nullzone/2):
             self.virtual_device.write(EV_KEY, xbox.LB, 0)
             self.virtual_device.write(EV_KEY, xbox.RB, 1)
         else: self.zero()
+
     def zero(self):
         self.virtual_device.write(EV_KEY, xbox.LB, 0)
         self.virtual_device.write(EV_KEY, xbox.RB, 0)
@@ -145,13 +171,13 @@ class KeyController(Controller):
         elif event.code == logi.BTN7:
             self.controller_manager.toggle(event)
         elif event.code == logi.BTN9:
-            self.virtual_device.write(EV_KEY, xbox.LTH, event.value)
+            self.virtual_device.write(EV_KEY, xbox.L3, event.value)
         elif event.code == logi.BTN10:
             self.controller_manager.throttle.update(event)
 
 def main(): 
     devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
-    physical_device = next((device for device in devices if device.name == logi.name), None)
+    physical_device = next((device for device in devices if logi.name in device.name), None)
     if physical_device == None: print("Logitech controller not found"); exit()
 
     # I have been needing to salt the VC for gta to recognize it more than once
