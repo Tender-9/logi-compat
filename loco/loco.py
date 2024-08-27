@@ -9,15 +9,13 @@ EV_ABS = evdev.ecodes.EV_ABS
 class ControllerManager:
     def __init__(self, virtual_device):
         self.virtual_device = virtual_device
-        self.running = 0
-        
         self.view     = ViewController(self, virtual_device)
         self.throttle = ThrottleController(self, virtual_device)
         self.pitch    = PitchController(self, virtual_device)
         self.roll     = RollController(self, virtual_device)
         self.yaw      = YawController(self, virtual_device)
         self.key      = KeyController(self, virtual_device)
-
+        self.running = 0
         self.zero_all()
     
     def toggle(self, event):
@@ -52,8 +50,6 @@ class ControllerManager:
         self.virtual_device.syn()
 
 
-
-
 class Controller:
     def __init__(self, controller_manager, virtual_device):
         self.controller_manager = controller_manager
@@ -63,9 +59,11 @@ class ViewController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
     
-    def update(self, event):
-        if event.code == logi.HATX: axis = xbox.RIGHT_X
-        elif event.code == logi.HATY: axis = xbox.RIGHT_Y
+    def update(self, event): 
+        if event.code == logi.HATX: 
+            axis = xbox.RIGHT_X
+        elif event.code == logi.HATY:
+            axis = xbox.RIGHT_Y
         else: return
 
         if event.value < 0: 
@@ -106,7 +104,6 @@ class PitchController(Controller):
         super().__init__(controller_manager, virtual_device)
     def update(self, event):
         self.virtual_device.write(EV_ABS, xbox.LEFT_Y, event.value)
-
     def zero(self):
         self.virtual_device.write(EV_ABS, xbox.LEFT_Y, 512)
 
@@ -114,18 +111,25 @@ class RollController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
     def update(self, event):
-        self.virtual_device.write(EV_ABS, xbox.LEFT_X, event.value)
-    
+        self.virtual_device.write(EV_ABS, xbox.LEFT_X, event.value) 
     def zero(self):
         self.virtual_device.write(EV_ABS, xbox.LEFT_X, 512)
 
 class YawController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
+        self.nullzone = 30
     def update(self, event):
-        pass
+        if event.value <= (255/2 - self.nullzone/2):
+            self.virtual_device.write(EV_KEY, xbox.LB, 1)
+            self.virtual_device.write(EV_KEY, xbox.RB, 0)
+        elif event.value >= (255/2 + self.nullzone/2):
+            self.virtual_device.write(EV_KEY, xbox.LB, 0)
+            self.virtual_device.write(EV_KEY, xbox.RB, 1)
+        else: self.zero()
     def zero(self):
-        pass
+        self.virtual_device.write(EV_KEY, xbox.LB, 0)
+        self.virtual_device.write(EV_KEY, xbox.RB, 0)
 
 class KeyController(Controller):
     def __init__(self, controller_manager, virtual_device):
@@ -136,13 +140,16 @@ class KeyController(Controller):
             self.virtual_device.write(EV_KEY, xbox.A, event.value)
         elif event.code == logi.THUMB:
             self.virtual_device.write(EV_KEY, xbox.DPAD_R, event.value)
+        elif event.code == logi.BTN3:
+            self.virtual_device.write(EV_KEY, xbox.X, event.value)
         elif event.code == logi.BTN7:
             self.controller_manager.toggle(event)
-        elif event.code == logi.BTN12:
+        elif event.code == logi.BTN9:
+            self.virtual_device.write(EV_KEY, xbox.LTH, event.value)
+        elif event.code == logi.BTN10:
             self.controller_manager.throttle.update(event)
 
-def main():
-    
+def main(): 
     devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
     physical_device = next((device for device in devices if device.name == logi.name), None)
     if physical_device == None: print("Logitech controller not found"); exit()
@@ -158,5 +165,5 @@ def main():
         for event in physical_device.read_loop():
             manager.handle_event(event)
     except KeyboardInterrupt:
-        print("\rClosing...")
+        print("Closing...")
         virtual_device.close()
