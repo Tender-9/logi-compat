@@ -118,7 +118,7 @@ class RollController(Controller):
 class YawController(Controller):
     def __init__(self, controller_manager, virtual_device):
         super().__init__(controller_manager, virtual_device)
-        self.nullzone = 30
+        self.nullzone = 100
     def update(self, event):
         if event.value <= (255/2 - self.nullzone/2):
             self.virtual_device.write(EV_KEY, xbox.LB, 1)
