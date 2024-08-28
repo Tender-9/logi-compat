@@ -106,11 +106,19 @@ class PitchController(Controller):
         super().__init__(controller_manager, virtual_device) 
         self.input  = logi.PITCH
         self.output = xbox.LEFT_Y
+        self.accel_c = 2
 
     def update(self, event):
-        value = self.translate(event.value)
+        value = self.accel(event.value)
+        value = self.translate(value)
         self.virtual_device.write(EV_ABS, self.output, value)
-    
+   
+    def accel(self, x):
+        c = self.accel_c
+        a = (c - 1) / 524288
+        b = (3 - 3*c) / 1024
+        return a*x**3 + b*x**2 + c*x
+
     def translate(self, value):
         position = (value - self.input.min) / (self.input.max - self.input.min)
         target = self.output.min + position * (self.output.max - self.output.min)
@@ -124,10 +132,18 @@ class RollController(Controller):
         super().__init__(controller_manager, virtual_device)
         self.input  = logi.ROLL
         self.output = xbox.LEFT_X  
-    
+        self.accel_c = 2
+
     def update(self, event):
-        value = self.translate(event.value)
+        value = self.accel(event.value)
+        value = self.translate(value)
         self.virtual_device.write(EV_ABS, xbox.LEFT_X, value) 
+    
+    def accel(self, x):
+        c = self.accel_c
+        a = (c - 1) / 524288
+        b = (3 - 3*c) / 1024
+        return a*x**3 + b*x**2 + c*x
     
     def translate(self, value):
         position = (value - self.input.min) / (self.input.max - self.input.min)
