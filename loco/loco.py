@@ -183,7 +183,9 @@ class KeyController(Controller):
         elif event.code == logi.THUMB:
             self.virtual_device.write(EV_KEY, xbox.DPAD_R, event.value)
         elif event.code == logi.BTN3:
-            self.virtual_device.write(EV_KEY, xbox.X, event.value)
+            self.virtual_device.write(EV_KEY, xbox.R3, event.value)
+        elif event.code == logi.BTN4:
+            self.virtual_device.write(EV_KEY, xbox.Y, event.value)
         elif event.code == logi.BTN7:
             self.controller_manager.toggle(event)
         elif event.code == logi.BTN9:
