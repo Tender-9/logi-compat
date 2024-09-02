@@ -3,8 +3,8 @@ from devices import Device, Axis, Key
 from evdev import ecodes
 
 class LogiController(Device):
-    def __init__(self) -> None:
-        super().__init__("Logitech Extreme 3D pro")
+    def __init__(self, name = "Logitech Extreme 3D pro") -> None:
+        super().__init__(name)
         self.TRIGGER = Key(self, ecodes.BTN_TRIGGER)
         self.THUMB   = Key(self, ecodes.BTN_THUMB)
         self.BTN3    = Key(self, ecodes.BTN_THUMB2)
@@ -28,8 +28,8 @@ class LogiController(Device):
 
 
 class XboxController(Device):
-    def __init__(self):
-        super().__init__("Xbox Controller")
+    def __init__(self, name = "Xbox Controller"):
+        super().__init__(name)
         self.A      = Key(self, ecodes.BTN_SOUTH)
         self.B      = Key(self, ecodes.BTN_EAST)
         self.X      = Key(self, ecodes.BTN_WEST)

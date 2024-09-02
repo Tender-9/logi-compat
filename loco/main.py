@@ -2,8 +2,12 @@
 from evdev.events import EV_ABS, EV_KEY
 from device_info import LogiController, XboxController
 
+import random
+chars = "abcdefghijklmnopqrstuvwxyz"
+salt = "".join(chars[random.randrange(len(chars))] for _ in range(4))
+
 logi = LogiController()
-xbox = XboxController()
+xbox = XboxController(name = "Xbox_" + salt)
 
 class ControllerManager:
     def __init__(self) -> None:
@@ -63,12 +67,13 @@ class ViewController():
 class ThrottleController():
     def __init__(self) -> None:
         self.throt_rev_key = logi.BTN10
+        self.input = logi.THROTTLE
         self.prev_input = 0
 
     def update(self, event) -> None:
         if event.code == self.throt_rev_key: 
             value = self.prev_input
-        else: value = event.value
+        else: value = self.input.max - event.value
         
         if self.throt_rev_key.state == 0:
             xbox.LT.write(xbox.LT.min)
@@ -138,12 +143,13 @@ class YawController():
         self.nullzone = 160 # I know I know magic numbers...
 
     def update(self, event):
-        if event.value <= (logi.YAW.rest - self.nullzone/2):
+        if event.value <= logi.YAW.rest - (self.nullzone/2):
             xbox.LB.write(1)
             xbox.RB.write(0)
-        elif event.value >= (logi.YAW.rest + self.nullzone/2):
+        elif event.value >= logi.YAW.rest + (self.nullzone/2):
             xbox.LB.write(0)
             xbox.RB.write(1)
+        else: self.zero()
 
     def zero(self):
         xbox.LB.write(0)
